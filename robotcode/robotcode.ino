@@ -209,31 +209,37 @@ void turnRight()
 
 void calibrateSensors()
 {
+  static const unsigned long MOVE_TIME = 350;
+  
   char dummy;
   int i;
 
   Serial.println("Calibrating sensors");
-  Serial.println("Please move the robot so that the sensors are on a line/wall");
+  Serial.println("Move the robot so that the sensors are just before a line/wall");
   Serial.println("Press space to continue");
   while (Serial.available() == 0)
   {
   
   }
   dummy = Serial.read();
-  
-  for (i = 0; i < 80; i++)
-  {
-    if ((i > 10 && i <= 30) || (i > 50 && i <= 70))
-      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-    else
-      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-    reflectanceSensors.calibrate();
 
-    // Since our counter runs to 80, the total delay will be
-    // 80*20 = 1600 ms.
-    delay(20);
+  for (i = 0; i < 10; i++)
+  {
+    unsigned long startTime = millis();
+    motors.setSpeeds(MAX_SPEED, MAX_SPEED);
+    while (millis() - startTime < MOVE_TIME)
+    {
+      reflectanceSensors.calibrate();
+    }
+
+    startTime = millis();
+    motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
+    while (millis() - startTime < MOVE_TIME)
+    {
+      reflectanceSensors.calibrate();
+    }
   }
-  motors.setSpeeds(0,0);
+  motors.setSpeeds(0, 0);
 
   for (i = 0; i < NUM_SENSORS; i++)
   {
