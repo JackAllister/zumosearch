@@ -6,50 +6,132 @@
  */
 #include <ZumoMotors.h>
 
-/* Module Constants */
-static const char CALIBRATION = 'C';
+/* Module typedefs */
+typedef enum
+{
+  GUIDED_NAVIGATE,
+  SEARCH_ROOM,
+  AUTONOMOUS_NAVIGATE
+} OPERATING_MODE;
+
+/* Module constants */
+static const char CALIBRATE = 'C';
 static const char FORWARD = 'W';
 static const char LEFT = 'A';
 static const char RIGHT = 'D';
-static const char BACKWARE = 'S';
+static const char BACKWARD = 'S';
+static const char STOP_ROBOT = 0x20;
 
 static const int MAX_SPEED = 100;
 
 /* Module variables */
 ZumoMotors motors;
 
+/* Calibration variables used for left/right turns */
 unsigned long calLeftTime = 0;
 unsigned long calRightTime = 0;
 
-/* Module Prototypes */
-void calibrateRobot();
+OPERATING_MODE robotMode = GUIDED_NAVIGATE;
+
+/* Module prototypes */
+void parseGuidedNavigate();
 void turnLeft();
 void turnRight();
+void calibrateRobot();
 
 /* Module code */
-void setup() {
+void setup() 
+{
   Serial.begin(9600);
 
   /* Make sure the robot is not moving */
   motors.setSpeeds(0, 0);
 }
 
-void loop() {
+void loop() 
+{
+  switch (robotMode)
+  {
+    case GUIDED_NAVIGATE:
+    {
+      parseGuidedNavigate();
+      break;
+    }
 
+    case SEARCH_ROOM:
+    {
+      break;
+    }
+
+    case AUTONOMOUS_NAVIGATE:
+    {
+      break;
+    }
+  }
+  
+}
+
+void parseGuidedNavigate()
+{
   if (Serial.available() > 0)
   {
     char recvByte = toupper(Serial.read());
 
     switch (recvByte)
     {
-      case CALIBRATION:
+      case CALIBRATE:
       {
         calibrateRobot();
         break;
       }
+
+      case FORWARD:
+      {
+        motors.setSpeeds(MAX_SPEED, MAX_SPEED);
+        break;
+      }
+
+      case BACKWARD:
+      {
+        motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
+        break;
+      }
+
+      case LEFT:
+      {
+        turnLeft();
+        break;
+      }
+
+      case RIGHT:
+      {
+        turnRight();
+        break;
+      }
+
+      case STOP_ROBOT:
+      {
+        motors.setSpeeds(0, 0);
+      }
     
     }
   }
+}
+
+void turnLeft()
+{
+  /* Turns the robot left 90 degress */
+  motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+  delay(calLeftTime);
+  motors.setSpeeds(0, 0);
+}
+
+void turnRight()
+{
+  /* Turns the robot right 90 degress */
+  motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+  delay(calRightTime);
+  motors.setSpeeds(0, 0);
 }
 
 void calibrateRobot()
@@ -119,15 +201,4 @@ void calibrateRobot()
 
   Serial.println("Calibration complete!");
 }
-
-void turnLeft()
-{
-  /* Turns the robot left 90 degress */
-}
-
-void turnRight()
-{
-  /* Turns the robot right 90 degress */
-}
-
 
