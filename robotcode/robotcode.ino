@@ -5,6 +5,8 @@
  * Jack Allister - 23042098
  */
 #include <ZumoMotors.h>
+#include <QTRSensors.h>
+#include <ZumoReflectanceSensorArray.h>
 
 /* Module typedefs */
 typedef enum
@@ -15,6 +17,8 @@ typedef enum
 } OPERATING_MODE;
 
 /* Module constants */
+#define NUM_SENSORS 6
+
 static const char CALIBRATE = 'C';
 static const char FORWARD = 'W';
 static const char LEFT = 'A';
@@ -26,6 +30,7 @@ static const int MAX_SPEED = 100;
 
 /* Module variables */
 ZumoMotors motors;
+ZumoReflectanceSensorArray reflectanceSensors;
 
 /* Calibration variables used for left/right turns */
 unsigned long calLeftTime = 0;
@@ -37,12 +42,15 @@ OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 void parseGuidedNavigate();
 void turnLeft();
 void turnRight();
-void calibrateRobot();
+void calibrateSensors();
+void calibrateTurns();
 
 /* Module code */
 void setup() 
 {
   Serial.begin(9600);
+
+  reflectanceSensors.init();
 
   /* Make sure the robot is not moving */
   motors.setSpeeds(0, 0);
@@ -81,7 +89,8 @@ void parseGuidedNavigate()
     {
       case CALIBRATE:
       {
-        calibrateRobot();
+        calibrateSensors();
+        calibrateTurns();
         break;
       }
 
@@ -134,20 +143,66 @@ void turnRight()
   motors.setSpeeds(0, 0);
 }
 
-void calibrateRobot()
+void calibrateSensors()
+{
+  char dummy;
+  int i;
+
+  Serial.println("Calibrating sensors");
+  Serial.println("Please move the robot so that the sensors are on a line/wall");
+  Serial.println("Press space to continue");
+  while (Serial.available() == 0)
+  {
+  
+  }
+  dummy = Serial.read();
+  
+  for (i = 0; i < 80; i++)
+  {
+    if ((i > 10 && i <= 30) || (i > 50 && i <= 70))
+      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+    else
+      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+    reflectanceSensors.calibrate();
+
+    // Since our counter runs to 80, the total delay will be
+    // 80*20 = 1600 ms.
+    delay(20);
+  }
+  motors.setSpeeds(0,0);
+
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print("Minimum values: ");
+    Serial.print(reflectanceSensors.calibratedMinimumOn[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print("Maximum values: ");
+    Serial.print(reflectanceSensors.calibratedMaximumOn[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+
+  Serial.println("Sensor calibration complete!");
+}
+
+void calibrateTurns()
 {
   static const unsigned long WAIT_TIME = 500;
   
   unsigned long startTime;
   unsigned long endTime;
   char dummy;
-  
-  Serial.println("Calibration mode");
 
   /* 
    *  This section calculates how long it takes to turn 90 degress, this is used
    *  so that we have accurate turning for the arduino.
-   */
+   */  
+  Serial.println("Calibrating turns, space to continue");
   Serial.println("Send space once then again, when the robot has turned 90* left");
   while (Serial.available() == 0)
   {
@@ -199,6 +254,6 @@ void calibrateRobot()
   Serial.print("Turn right time: ");
   Serial.println(calRightTime);
 
-  Serial.println("Calibration complete!");
+  Serial.println("Turn calibration complete!");
 }
 
