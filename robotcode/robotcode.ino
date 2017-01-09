@@ -21,9 +21,9 @@ typedef enum
 
 static const char CALIBRATE = 'C';
 static const char FORWARD = 'W';
+static const char BACKWARD = 'S';
 static const char LEFT = 'A';
 static const char RIGHT = 'D';
-static const char BACKWARD = 'S';
 static const char STOP_ROBOT = 0x20;
 
 static const int MAX_SPEED = 100;
@@ -36,10 +36,13 @@ ZumoReflectanceSensorArray reflectanceSensors;
 unsigned long calLeftTime = 0;
 unsigned long calRightTime = 0;
 
+bool isMoving = false;
+
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 
 /* Module prototypes */
 void parseGuidedNavigate();
+bool isWallFound();
 void turnLeft();
 void turnRight();
 void calibrateSensors();
@@ -63,6 +66,13 @@ void loop()
     case GUIDED_NAVIGATE:
     {
       parseGuidedNavigate();
+
+      if (isMoving && (isWallFound() == true))
+      {
+        robotStop();
+        Serial.println("Wall found");
+      }
+        
       break;
     }
 
@@ -96,13 +106,13 @@ void parseGuidedNavigate()
 
       case FORWARD:
       {
-        motors.setSpeeds(MAX_SPEED, MAX_SPEED);
+        robotForward();
         break;
       }
 
       case BACKWARD:
       {
-        motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
+        robotBackward();
         break;
       }
 
@@ -120,15 +130,67 @@ void parseGuidedNavigate()
 
       case STOP_ROBOT:
       {
-        motors.setSpeeds(0, 0);
-      }
-    
+        robotStop();
+        break;
+      } 
     }
   }
 }
 
+bool isWallFound()
+{
+  static const int LINE_VALUE = 650;
+  
+  unsigned int sensorValues[NUM_SENSORS];
+  int i;
+  bool result = true;
+
+  reflectanceSensors.readLine(sensorValues);
+
+  for (i = 0; i < NUM_SENSORS; i++)
+  {
+    Serial.print(sensorValues[i]);
+    Serial.print(' ');
+  }
+  Serial.println();
+
+  /* Check sensors 1-4 to see if wall detected */
+  for (i = 1; i < 4; i++)
+  {
+    if (sensorValues[i] <= LINE_VALUE)
+    {
+      result = false;
+    }
+  }
+
+  return result;
+}
+
+void robotForward()
+{
+  Serial.println("Robot moving forwards");
+  motors.setSpeeds(MAX_SPEED, MAX_SPEED);
+  isMoving = true;
+}
+
+void robotBackward()
+{
+  Serial.println("Robot moving backwards");
+  motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
+  isMoving = true;
+}
+
+void robotStop()
+{
+  Serial.println("Robot stopping");
+  motors.setSpeeds(0, 0);
+  isMoving = false;
+}
+
 void turnLeft()
 {
+  Serial.println("Robot turning left 90*");
+  
   /* Turns the robot left 90 degress */
   motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
   delay(calLeftTime);
@@ -137,6 +199,8 @@ void turnLeft()
 
 void turnRight()
 {
+  Serial.println("Robot turning right 90*");
+  
   /* Turns the robot right 90 degress */
   motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
   delay(calRightTime);
