@@ -32,10 +32,6 @@ static const int MAX_SPEED = 100;
 ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 
-/* Calibration variables used for left/right turns */
-unsigned long calLeftTime = 0;
-unsigned long calRightTime = 0;
-
 bool isMoving = false;
 
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
@@ -43,10 +39,12 @@ OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 /* Module prototypes */
 void parseGuidedNavigate();
 bool isWallFound();
+void robotForward();
+void robotBackward();
 void turnLeft();
 void turnRight();
+void robotStop();
 void calibrateSensors();
-void calibrateTurns();
 
 /* Module code */
 void setup() 
@@ -100,7 +98,6 @@ void parseGuidedNavigate()
       case CALIBRATE:
       {
         calibrateSensors();
-        calibrateTurns();
         break;
       }
 
@@ -180,31 +177,25 @@ void robotBackward()
   isMoving = true;
 }
 
+void turnLeft()
+{
+  Serial.println("Robot turning left");
+  motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+  isMoving = true;
+}
+
+void turnRight()
+{
+  Serial.println("Robot turning right");
+  motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+  isMoving = true;
+}
+
 void robotStop()
 {
   Serial.println("Robot stopping");
   motors.setSpeeds(0, 0);
   isMoving = false;
-}
-
-void turnLeft()
-{
-  Serial.println("Robot turning left 90*");
-  
-  /* Turns the robot left 90 degress */
-  motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-  delay(calLeftTime);
-  motors.setSpeeds(0, 0);
-}
-
-void turnRight()
-{
-  Serial.println("Robot turning right 90*");
-  
-  /* Turns the robot right 90 degress */
-  motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-  delay(calRightTime);
-  motors.setSpeeds(0, 0);
 }
 
 void calibrateSensors()
@@ -258,72 +249,5 @@ void calibrateSensors()
   Serial.println();
 
   Serial.println("Sensor calibration complete!");
-}
-
-void calibrateTurns()
-{
-  static const unsigned long WAIT_TIME = 500;
-  
-  unsigned long startTime;
-  unsigned long endTime;
-  char dummy;
-
-  /* 
-   *  This section calculates how long it takes to turn 90 degress, this is used
-   *  so that we have accurate turning for the arduino.
-   */  
-  Serial.println("Calibrating turns, space to continue");
-  Serial.println("Send space once then again, when the robot has turned 90* left");
-  while (Serial.available() == 0)
-  {
-  
-  }
-  dummy = Serial.read();
-  delay(WAIT_TIME);
-  
-  startTime = millis();
-  motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-
-  /* Wait until the second press */
-  while (Serial.available() == 0)
-  {
-    
-  }
-  dummy = Serial.read();
-  endTime = millis();
-  motors.setSpeeds(0, 0);
-
-  /* Below is the time it takes to turn 90 degress left */
-  calLeftTime = endTime - startTime;
-  Serial.print("Turn left time: ");
-  Serial.println(calLeftTime);
-  
-  /* Now we do the same again but for right turns */
-  Serial.println("Send space once then again, when the robot has turned 90* right");
-  while (Serial.available() == 0)
-  {
-  
-  }
-  dummy = Serial.read();
-  delay(WAIT_TIME);
-  
-  startTime = millis();
-  motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-
-  /* Wait until the second press */
-  while (Serial.available() == 0)
-  {
-    
-  }
-  dummy = Serial.read();
-  endTime = millis();
-  motors.setSpeeds(0, 0);
-
-  /* Below is the time it takes to turn 90 degress left */
-  calRightTime = endTime - startTime;
-  Serial.print("Turn right time: ");
-  Serial.println(calRightTime);
-
-  Serial.println("Turn calibration complete!");
 }
 
