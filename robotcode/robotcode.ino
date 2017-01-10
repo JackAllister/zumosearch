@@ -16,15 +16,25 @@ typedef enum
   AUTONOMOUS_NAVIGATE
 } OPERATING_MODE;
 
+typedef enum
+{
+  FORWARD,
+  BACKWARD,
+  LEFT,
+  RIGHT,
+  STOPPED
+} CURRENT_MOVEMENT;
+
 /* Module constants */
 #define NUM_SENSORS 6
 
-static const char CALIBRATE = 'C';
-static const char FORWARD = 'W';
-static const char BACKWARD = 'S';
-static const char LEFT = 'A';
-static const char RIGHT = 'D';
-static const char STOP_ROBOT = 0x20;
+static const char CHAR_CALIBRATE = '1';
+static const char CHAR_WALL_DETECT = 'C';
+static const char CHAR_FORWARD = 'W';
+static const char CHAR_BACKWARD = 'S';
+static const char CHAR_LEFT = 'A';
+static const char CHAR_RIGHT = 'D';
+static const char CHAR_STOP = 0x20;
 
 static const int MAX_SPEED = 100;
 
@@ -32,12 +42,17 @@ static const int MAX_SPEED = 100;
 ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 
-bool isMoving = false;
-
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
+CURRENT_MOVEMENT currMovement = STOPPED;
+bool wallDetect = true;
+
+/* Speeds used for path correction */
+int lastLeftSpeed = 0;
+int lastRightSpeed = 0;
 
 /* Module prototypes */
 void parseGuidedNavigate();
+bool correctPath();
 bool isWallFound();
 void robotForward();
 void robotBackward();
@@ -65,12 +80,26 @@ void loop()
     {
       parseGuidedNavigate();
 
-      if (isMoving && (isWallFound() == true))
+      if (currMovement == FORWARD)
       {
-        robotStop();
-        Serial.println("Wall found");
-      }
-        
+        if (wallDetect == true)
+        {
+          if (isWallFound() == true)
+          {
+            robotStop();
+            Serial.println("Wall found, press C to re-enable when moved.");
+            wallDetect = false;
+          }
+          else if (correctPath() == true)
+          {
+            /* Only correct the path if a wall has not been found */
+            Serial.print("Path corrected, wheels speeds: ");
+            Serial.print(lastLeftSpeed);
+            Serial.print(' ');
+            Serial.println(lastRightSpeed);
+          } 
+        }
+      }        
       break;
     }
 
@@ -95,43 +124,99 @@ void parseGuidedNavigate()
 
     switch (recvByte)
     {
-      case CALIBRATE:
+      case CHAR_CALIBRATE:
       {
         calibrateSensors();
         break;
       }
 
-      case FORWARD:
+      case CHAR_FORWARD:
       {
         robotForward();
         break;
       }
 
-      case BACKWARD:
+      case CHAR_BACKWARD:
       {
         robotBackward();
         break;
       }
 
-      case LEFT:
+      case CHAR_LEFT:
       {
         turnLeft();
         break;
       }
 
-      case RIGHT:
+      case CHAR_RIGHT:
       {
         turnRight();
         break;
       }
 
-      case STOP_ROBOT:
+      case CHAR_STOP:
       {
         robotStop();
         break;
       } 
+
+      case CHAR_WALL_DETECT:
+      {
+        wallDetect = true;
+        Serial.println("Wall detect enabled");
+        break;
+      }
     }
   }
+}
+
+bool correctPath()
+{
+  static const int LEFT_SENSOR = 0;
+  static const int RIGHT_SENSOR = 5;
+  static const int ADJUST_VALUE = 30;
+  static const int LINE_VALUE = 650;
+
+  static unsigned long lastTime = 0;
+  unsigned int sensorValues[NUM_SENSORS];
+  bool result = false;
+
+  /* Corrects the path to stop a side from accidentally going on a wall */
+
+  /* Correction can only happen once per second */
+  if ((lastTime == 0) || ((millis() - lastTime) >= 1000))
+  {
+    reflectanceSensors.readLine(sensorValues);
+  
+    if (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
+    {
+      /* If far left sensor on a line correct path a little */
+      lastLeftSpeed += ADJUST_VALUE;
+      lastRightSpeed -= ADJUST_VALUE;
+      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+      Serial.print("Corrected left: ");
+      Serial.print(lastLeftSpeed);
+      Serial.print(" ");
+      Serial.println(lastRightSpeed);
+      lastTime = millis();
+      result = true;
+    }
+    else if (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+    {
+      /* If far right sensor on a line correct path a little */
+      lastLeftSpeed -= ADJUST_VALUE;
+      lastRightSpeed += ADJUST_VALUE;
+      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+      Serial.print("Corrected right: ");
+      Serial.print(lastLeftSpeed);
+      Serial.print(" ");
+      Serial.println(lastRightSpeed);
+      lastTime = millis();
+      result = true;
+    }
+  }
+
+  return result;
 }
 
 bool isWallFound()
@@ -144,12 +229,12 @@ bool isWallFound()
 
   reflectanceSensors.readLine(sensorValues);
 
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    Serial.print(sensorValues[i]);
-    Serial.print(' ');
-  }
-  Serial.println();
+//  for (i = 0; i < NUM_SENSORS; i++)
+//  {
+//    Serial.print(sensorValues[i]);
+//    Serial.print(' ');
+//  }
+//  Serial.println();
 
   /* Check sensors 1-4 to see if wall detected */
   for (i = 1; i < 4; i++)
@@ -167,35 +252,55 @@ void robotForward()
 {
   Serial.println("Robot moving forwards");
   motors.setSpeeds(MAX_SPEED, MAX_SPEED);
-  isMoving = true;
+
+  /* Set values needed for collision detection */
+  currMovement = FORWARD;
+  lastLeftSpeed = MAX_SPEED;
+  lastRightSpeed = MAX_SPEED; 
 }
 
 void robotBackward()
 {
   Serial.println("Robot moving backwards");
   motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
-  isMoving = true;
+
+  /* Set values needed for collision detection */
+  currMovement = BACKWARD;
+  lastLeftSpeed = -MAX_SPEED;
+  lastRightSpeed = -MAX_SPEED; 
 }
 
 void turnLeft()
 {
   Serial.println("Robot turning left");
   motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-  isMoving = true;
+
+  /* Set values needed for collision detection */
+  currMovement = LEFT;
+  lastLeftSpeed = -MAX_SPEED;
+  lastRightSpeed = MAX_SPEED; 
 }
 
 void turnRight()
 {
   Serial.println("Robot turning right");
   motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-  isMoving = true;
+
+  /* Set values needed for collision detection */
+    currMovement = RIGHT;
+  lastLeftSpeed = MAX_SPEED;
+  lastRightSpeed = -MAX_SPEED; 
 }
 
 void robotStop()
 {
   Serial.println("Robot stopping");
   motors.setSpeeds(0, 0);
-  isMoving = false;
+
+  /* Set values needed for collision detection */
+  currMovement = STOPPED;
+  lastLeftSpeed = 0;
+  lastRightSpeed = 0; 
 }
 
 void calibrateSensors()
