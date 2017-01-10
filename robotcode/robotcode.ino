@@ -36,7 +36,7 @@ static const char CHAR_LEFT = 'A';
 static const char CHAR_RIGHT = 'D';
 static const char CHAR_STOP = 0x20;
 
-static const int MAX_SPEED = 100;
+static const int MAX_SPEED = 120;
 
 /* Module variables */
 ZumoMotors motors;
@@ -162,8 +162,15 @@ void parseGuidedNavigate()
 
       case CHAR_WALL_DETECT:
       {
-        wallDetect = true;
-        Serial.println("Wall detect enabled");
+        if (wallDetect == false)
+        {
+          wallDetect = true;
+          Serial.println("Wall detect enabled");
+        }
+        else
+        {
+          Serial.println("Wall detect already enabled");
+        }
         break;
       }
     }
