@@ -29,6 +29,7 @@ typedef enum
 #define NUM_SENSORS 6
 
 static const char CHAR_CALIBRATE = '1';
+static const char CHAR_CHECK_ROOM = '2';
 static const char CHAR_WALL_DETECT = 'C';
 static const char CHAR_ROOM = 'R';
 static const char CHAR_FORWARD = 'W';
@@ -125,6 +126,13 @@ void loop()
 
     case SEARCH_ROOM:
     {
+      if (recvByte != 0)
+      {
+        if (parseMovement(recvByte) == false)
+        {
+          parseSearchRoom(recvByte);
+        }
+      }
       break;
     }
 
@@ -166,9 +174,24 @@ void parseGuidedNavigate(char recv)
   }
 }
 
-void parseRoomSearch(char recv)
+void parseSearchRoom(char recv)
 {
-  
+  switch (recv)
+  {
+    case CHAR_CHECK_ROOM:
+    {
+      Serial.println("Checking room for objects");
+      /* Perform a quick scan of the room using US to find items */
+      break;
+    }
+
+    case CHAR_ROOM:
+    {
+      robotMode = GUIDED_NAVIGATE;
+      Serial.println("Leaving search mode, going back to guided");
+      break;
+    }
+  } 
 }
 
 bool parseMovement(char recv)
@@ -219,7 +242,6 @@ bool parseMovement(char recv)
        * If character does not match a movement key 
        * this function should return false.
        */
-       Serial.println("MV CHAR NOT FOUND");
        result = false;
     }
   }
