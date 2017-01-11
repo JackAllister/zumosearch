@@ -179,53 +179,60 @@ void parseGuidedNavigate()
 
 bool correctPath()
 {
+  static const unsigned long CORR_INTERVAL = 50;
   static const int LEFT_SENSOR = 0;
   static const int RIGHT_SENSOR = 5;
   static const int LINE_VALUE = 400;
 
+  static unsigned long lastRun = 0;
   unsigned int sensorValues[NUM_SENSORS];
   bool result = false;
 
   /* Corrects the path to stop a side from accidentally going on a wall */
 
-  /* Correction can only happen once per second */
-  reflectanceSensors.readLine(sensorValues);
-  
-  if (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
+  /* Correction happens every 50ms */
+  if ((lastRun == 0) || (millis() - lastRun > CORR_INTERVAL))
   {
-    motors.setSpeeds(0, 0);
-    while (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
-    {
-      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-      
-      reflectanceSensors.readLine(sensorValues);
-    }
-    motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+    lastRun = millis();
     
-    /* If far left sensor on a line correct path a little */
-    Serial.print("Corrected left: ");
-    Serial.print(lastLeftSpeed);
-    Serial.print(" ");
-    Serial.println(lastRightSpeed);
-    result = true;
-  }
-  else if (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
-  {
-    motors.setSpeeds(0, 0);
-    while (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+    reflectanceSensors.readLine(sensorValues);
+    
+    if (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
     {
-      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+      motors.setSpeeds(0, 0);
+      while (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
+      {
+        motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+        
+        reflectanceSensors.readLine(sensorValues);
+      }
+      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
       
-      reflectanceSensors.readLine(sensorValues);
+      /* If far left sensor on a line correct path a little */
+      Serial.print("Corrected left: ");
+      Serial.print(lastLeftSpeed);
+      Serial.print(" ");
+      Serial.println(lastRightSpeed);
+      result = true;
     }
-    motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
-
-    /* If far right sensor on a line correct path a little */
-    Serial.print("Corrected right: ");
-    Serial.print(lastLeftSpeed);
-    Serial.print(" ");
-    Serial.println(lastRightSpeed);
-    result = true;
+    else if (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+    {
+      motors.setSpeeds(0, 0);
+      while (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+      {
+        motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+        
+        reflectanceSensors.readLine(sensorValues);
+      }
+      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+  
+      /* If far right sensor on a line correct path a little */
+      Serial.print("Corrected right: ");
+      Serial.print(lastLeftSpeed);
+      Serial.print(" ");
+      Serial.println(lastRightSpeed);
+      result = true;
+    }
   }
 
   return result;
@@ -237,7 +244,7 @@ bool isWallFound()
   
   unsigned int sensorValues[NUM_SENSORS];
   int i;
-  bool result = false;
+  int detectCount = 0;
 
   reflectanceSensors.readLine(sensorValues);
 
@@ -248,16 +255,17 @@ bool isWallFound()
 //  }
 //  Serial.println();
 
-  /* Check sensors 1-4 to see if wall detected */
-  for (i = 1; i < 4; i++)
+  /* Check sensors 0-6 to see if wall detected */
+  for (i = 0; i < NUM_SENSORS; i++)
   {
     if (sensorValues[i] >= LINE_VALUE)
     {
-      result = true;
+      detectCount++;
     }
   }
 
-  return result;
+  /* Return true if more than one sensor detects a line */
+  return (detectCount>1);
 }
 
 void robotForward()
