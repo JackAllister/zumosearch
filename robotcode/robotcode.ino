@@ -22,14 +22,15 @@ typedef enum
   BACKWARD,
   LEFT,
   RIGHT,
-  STOPPED
-} CURRENT_MOVEMENT;
+  NONE
+} MOVEMENT;
 
 /* Module constants */
 #define NUM_SENSORS 6
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_WALL_DETECT = 'C';
+static const char CHAR_ROOM = 'R';
 static const char CHAR_FORWARD = 'W';
 static const char CHAR_BACKWARD = 'S';
 static const char CHAR_LEFT = 'A';
@@ -43,15 +44,20 @@ ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
-CURRENT_MOVEMENT currMovement = STOPPED;
+MOVEMENT currMovement = NONE;
 bool wallDetect = true;
 
 /* Speeds used for path correction */
 int lastLeftSpeed = 0;
 int lastRightSpeed = 0;
 
+int roomCount = 0;
+
 /* Module prototypes */
-void parseGuidedNavigate();
+void parseGuidedNavigate(char recv);
+void parseSearchRoom(char recv);
+bool parseMovement(char recv);
+
 bool correctPath();
 bool isWallFound();
 void robotForward();
@@ -74,11 +80,25 @@ void setup()
 
 void loop() 
 {
+  char recvByte = 0;
+
+  /* Check serial to see if we have received any commands */
+  if (Serial.available() != 0)
+  {
+    recvByte = toupper(Serial.read());
+  }
+  
   switch (robotMode)
   {
     case GUIDED_NAVIGATE:
     {
-      parseGuidedNavigate();
+      if (recvByte != 0)
+      {
+        if (parseMovement(recvByte) == false)
+        {
+          parseGuidedNavigate(recvByte);
+        }
+      }
 
       if (currMovement == FORWARD)
       {
@@ -116,65 +136,95 @@ void loop()
   
 }
 
-void parseGuidedNavigate()
+void parseGuidedNavigate(char recv)
 {
-  if (Serial.available() > 0)
+  switch (recv)
   {
-    char recvByte = toupper(Serial.read());
-
-    switch (recvByte)
+    case CHAR_WALL_DETECT:
     {
-      case CHAR_CALIBRATE:
+      if (wallDetect == false)
       {
-        calibrateSensors();
-        break;
+        wallDetect = true;
+        Serial.println("Wall detect enabled");
       }
-
-      case CHAR_FORWARD:
+      else
       {
-        robotForward();
-        break;
+        Serial.println("Wall detect already enabled");
       }
+      break;
+    }
 
-      case CHAR_BACKWARD:
-      {
-        robotBackward();
-        break;
-      }
-
-      case CHAR_LEFT:
-      {
-        turnLeft();
-        break;
-      }
-
-      case CHAR_RIGHT:
-      {
-        turnRight();
-        break;
-      }
-
-      case CHAR_STOP:
-      {
-        robotStop();
-        break;
-      } 
-
-      case CHAR_WALL_DETECT:
-      {
-        if (wallDetect == false)
-        {
-          wallDetect = true;
-          Serial.println("Wall detect enabled");
-        }
-        else
-        {
-          Serial.println("Wall detect already enabled");
-        }
-        break;
-      }
+    case CHAR_ROOM:
+    {
+      robotMode = SEARCH_ROOM;
+      roomCount++;
+      
+      Serial.print("Room search: ");
+      Serial.println(roomCount);
+      break;
     }
   }
+}
+
+void parseRoomSearch(char recv)
+{
+  
+}
+
+bool parseMovement(char recv)
+{
+  bool result = true;
+  
+  switch (recv)
+  {
+    case CHAR_CALIBRATE:
+    {
+      calibrateSensors();
+      break;
+    }
+
+    case CHAR_FORWARD:
+    {
+      robotForward();
+      break;
+    }
+
+    case CHAR_BACKWARD:
+    {
+      robotBackward();
+      break;
+    }
+
+    case CHAR_LEFT:
+    {
+      turnLeft();
+      break;
+    }
+
+    case CHAR_RIGHT:
+    {
+      turnRight();
+      break;
+    }
+
+    case CHAR_STOP:
+    {
+      robotStop();
+      break;
+    } 
+
+    default:
+    {
+      /* 
+       * If character does not match a movement key 
+       * this function should return false.
+       */
+       Serial.println("MV CHAR NOT FOUND");
+       result = false;
+    }
+  }
+
+  return result;
 }
 
 bool correctPath()
@@ -318,7 +368,7 @@ void robotStop()
   motors.setSpeeds(0, 0);
 
   /* Set values needed for collision detection */
-  currMovement = STOPPED;
+  currMovement = NONE;
   lastLeftSpeed = 0;
   lastRightSpeed = 0; 
 }
