@@ -182,7 +182,7 @@ bool correctPath()
   static const int LEFT_SENSOR = 0;
   static const int RIGHT_SENSOR = 5;
   static const int ADJUST_VALUE = 30;
-  static const int LINE_VALUE = 650;
+  static const int LINE_VALUE = 400;
 
   static unsigned long lastTime = 0;
   unsigned int sensorValues[NUM_SENSORS];
@@ -228,7 +228,7 @@ bool correctPath()
 
 bool isWallFound()
 {
-  static const int LINE_VALUE = 650;
+  static const int LINE_VALUE = 400;
   
   unsigned int sensorValues[NUM_SENSORS];
   int i;
