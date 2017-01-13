@@ -174,7 +174,7 @@ void parseGuidedNavigate(char recv)
   }
 }
 
-void parseSearchRoom(char recv)
+void parseRoomSearch(char recv)
 {
   switch (recv)
   {
