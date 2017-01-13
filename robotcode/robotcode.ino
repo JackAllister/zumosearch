@@ -181,20 +181,67 @@ void parseGuidedNavigate(char recv)
 
 void parseSearchRoom(char recv)
 {
+  static const unsigned long TURN_TIME = 500;
+  
   switch (recv)
   {
     case CHAR_CHECK_ROOM:
     {
+      unsigned long startTime;
+      unsigned long pingDist;
+      
       Serial.println("Checking room for objects");
-      /* Perform a quick scan of the room using US to find items */        
-      do
+      /* Perform a quick scan of the room using US to find items */ 
+
+      /* Check left direction */
+      Serial.println("Checking left");
+      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+      startTime = millis();
+      while ((millis() - startTime) < TURN_TIME)
       {
         delay(50);
-        Serial.print("Ping: ");
-        Serial.print(sonar.ping_cm());
-        Serial.println("cm");
-         
-      } while (true);
+        pingDist = sonar.ping_cm();
+        if (pingDist != 0)
+        {
+          /* If we get here means object found in left of room */
+          Serial.print("Object found in left of room ");
+          Serial.print(pingDist);
+          Serial.print(" cm away.");
+        } 
+      }
+
+      /* Move right to midpoint */
+      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+      startTime = millis();
+      while ((millis() - startTime) < TURN_TIME)
+      {
+        /* Do nothing here as returning */
+      }
+
+      /* Check right direction */
+      Serial.println("Checking right");
+      startTime = millis();
+      while ((millis() - startTime) < TURN_TIME)
+      {
+        delay(50);
+        pingDist = sonar.ping_cm();
+        if (pingDist != 0)
+        {
+          /* If we get here means object found in right of room */
+          Serial.print("Object found in right of room ");
+          Serial.print(pingDist);
+          Serial.print(" cm away.");
+        }
+      }
+
+      /* Move left to midpoint */
+      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+      startTime = millis();
+      while ((millis() - startTime) < TURN_TIME)
+      {
+        /* Do nothing here as returning */
+      }
+      motors.setSpeeds(0, 0);
       
       break;
     }
