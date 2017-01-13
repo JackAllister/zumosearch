@@ -40,7 +40,7 @@ typedef struct
 #define ECHO_PIN 3
 #define MAX_DISTANCE 20
 
-#define MAX_COORDINATES 50
+#define MAX_COORDINATES 80
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
@@ -307,7 +307,6 @@ void runAutonomousMode()
   int i = 0;
   MOVEMENT inverse;
   unsigned long startTime;
-  bool corrected;
 
   for (i = movLogCount; i != -1; i--)
   {
@@ -316,7 +315,6 @@ void runAutonomousMode()
     
     if (movLog[i].movement != NONE)
     {      
-      corrected = false;
       inverse = findInverse(movLog[i].movement);
     
       /* Move in inverse direction to backtrace */
@@ -324,14 +322,20 @@ void runAutonomousMode()
       moveDirection(inverse);
       while (millis() - startTime < movLog[i].time)
       {
-        if ((corrected == false) && (correctPath() == true))
+        if (inverse == FORWARD)
         {
-          Serial.print("Path corrected, wheels speeds: ");
-          Serial.print(lastLeftSpeed);
-          Serial.print(' ');
-          Serial.println(lastRightSpeed);
-          corrected = true;
-        } 
+          if (isWallFound() == true)
+          {
+            motors.setSpeeds(0, 0);
+          }
+          else if (correctPath() == true)
+          {
+            Serial.print("Path corrected, wheels speeds: ");
+            Serial.print(lastLeftSpeed);
+            Serial.print(' ');
+            Serial.println(lastRightSpeed);
+          } 
+        }
       }
     }
   }
@@ -533,6 +537,7 @@ bool correctPath()
   static unsigned long lastRun = 0;
   unsigned int sensorValues[NUM_SENSORS];
   bool result = false;
+  MOVEMENT lastMovement;
 
   /* Corrects the path to stop a side from accidentally going on a wall */
 
