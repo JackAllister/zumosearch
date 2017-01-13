@@ -26,16 +26,27 @@ typedef enum
   NONE
 } MOVEMENT;
 
+typedef struct
+{
+  MOVEMENT movement;
+  unsigned long time;
+} MOVEMENT_COORD;
+
 /* Module constants */
 #define NUM_SENSORS 6
+
+/* Ultrasonic sensor */
 #define TRIGGER_PIN 2
 #define ECHO_PIN 3
-#define MAX_DISTANCE 20 /* maximum 20cm */
+#define MAX_DISTANCE 20
+
+#define MAX_COORDINATES 30
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
 static const char CHAR_WALL_DETECT = 'C';
 static const char CHAR_ROOM = 'R';
+static const char CHAR_AUTONOMOUS = 'E';
 static const char CHAR_FORWARD = 'W';
 static const char CHAR_BACKWARD = 'S';
 static const char CHAR_LEFT = 'A';
@@ -48,6 +59,10 @@ static const int MAX_SPEED = 120;
 ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
+
+/* Array of directions used for autonomous mode */
+MOVEMENT_COORD movLog[MAX_COORDINATES] = {NONE, 0};
+int movLogCount = 0;
 
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 MOVEMENT currMovement = NONE;
@@ -64,14 +79,13 @@ void parseGuidedNavigate(char recv);
 void parseSearchRoom(char recv);
 bool parseMovement(char recv);
 
+void runAutonomousMode();
+MOVEMENT findInverse(MOVEMENT movement);
+void moveDirection(MOVEMENT movement);
+
 bool checkForObject();
 bool correctPath();
 bool isWallFound();
-void robotForward();
-void robotBackward();
-void turnLeft();
-void turnRight();
-void robotStop();
 void calibrateSensors();
 
 /* Module code */
@@ -113,7 +127,7 @@ void loop()
         {
           if (isWallFound() == true)
           {
-            robotStop();
+            moveDirection(NONE);
             Serial.println("Wall found, press C to re-enable when moved.");
             wallDetect = false;
           }
@@ -144,6 +158,11 @@ void loop()
 
     case AUTONOMOUS_NAVIGATE:
     {
+      /* Wait until receive byte found */
+      if (recvByte != 0)
+      {
+        
+      }
       break;
     }
   }
@@ -154,6 +173,12 @@ void parseGuidedNavigate(char recv)
 {
   switch (recv)
   {
+    case CHAR_CALIBRATE:
+    {
+      calibrateSensors();
+      break;
+    }
+
     case CHAR_WALL_DETECT:
     {
       if (wallDetect == false)
@@ -175,6 +200,13 @@ void parseGuidedNavigate(char recv)
       
       Serial.print("Room search: ");
       Serial.println(roomCount);
+      break;
+    }
+
+    case CHAR_AUTONOMOUS:
+    {
+      robotMode = AUTONOMOUS_NAVIGATE;
+      Serial.println("Autonomous mode started");
       break;
     }
   }
@@ -205,39 +237,33 @@ bool parseMovement(char recv)
   
   switch (recv)
   {
-    case CHAR_CALIBRATE:
-    {
-      calibrateSensors();
-      break;
-    }
-
     case CHAR_FORWARD:
     {
-      robotForward();
+      moveDirection(FORWARD);
       break;
     }
 
     case CHAR_BACKWARD:
     {
-      robotBackward();
+      moveDirection(BACKWARD);
       break;
     }
 
     case CHAR_LEFT:
     {
-      turnLeft();
+      moveDirection(LEFT);
       break;
     }
 
     case CHAR_RIGHT:
     {
-      turnRight();
+      moveDirection(RIGHT);
       break;
     }
 
     case CHAR_STOP:
     {
-      robotStop();
+      moveDirection(NONE);
       break;
     } 
 
@@ -252,6 +278,128 @@ bool parseMovement(char recv)
   }
 
   return result;
+}
+
+void runAutonomousMode()
+{
+  int i = 0;
+  MOVEMENT inverse;
+  unsigned long startTime;
+
+  for (i = movLogCount; i = -1; i++)
+  {
+    inverse = findInverse(movLog[i].movement);
+  
+    /* Move in inverse direction to backtrace */
+    startTime = millis();
+    moveDirection(inverse);
+    while (millis() - startTime < movLog[i].time)
+    {
+      /* Do nothing */
+    }
+  }
+  moveDirection(NONE);
+}
+
+MOVEMENT findInverse(MOVEMENT movement)
+{
+  MOVEMENT result = NONE;
+  
+  switch (movement)
+  {
+    case FORWARD:
+    {
+      result = BACKWARD;
+      break;
+    }
+
+    case BACKWARD:
+    {
+      result = FORWARD;
+      break;
+    }
+
+    case LEFT:
+    {
+      result = RIGHT;
+      break;
+    }
+
+    case RIGHT:
+    {
+      result = LEFT;
+      break;
+    }
+  }
+
+  return result;
+}
+
+
+void moveDirection(MOVEMENT movement)
+{
+  switch (movement)
+  {
+    case FORWARD:
+    {
+      Serial.println("Robot moving forwards");
+      motors.setSpeeds(MAX_SPEED, MAX_SPEED);
+    
+      /* Set values needed for collision detection */
+      currMovement = FORWARD;
+      lastLeftSpeed = MAX_SPEED;
+      lastRightSpeed = MAX_SPEED;
+      break; 
+    }
+
+    case BACKWARD:
+    {
+      Serial.println("Robot moving backwards");
+      motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
+      
+      /* Set values needed for collision detection */
+      currMovement = BACKWARD;
+      lastLeftSpeed = -MAX_SPEED;
+      lastRightSpeed = -MAX_SPEED; 
+      break;
+    }
+
+    case LEFT:
+    {
+      Serial.println("Robot turning left");
+      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+    
+      /* Set values needed for collision detection */
+      currMovement = LEFT;
+      lastLeftSpeed = -MAX_SPEED;
+      lastRightSpeed = MAX_SPEED; 
+      break;
+    }
+
+    case RIGHT:
+    {
+      Serial.println("Robot turning right");
+      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+    
+      /* Set values needed for collision detection */
+      currMovement = RIGHT;
+      lastLeftSpeed = MAX_SPEED;
+      lastRightSpeed = -MAX_SPEED; 
+      break;
+    }
+
+    case NONE:
+    {
+      Serial.println("Robot stopping");
+      motors.setSpeeds(0, 0);
+    
+      /* Set values needed for collision detection */
+      currMovement = NONE;
+      lastLeftSpeed = 0;
+      lastRightSpeed = 0; 
+      break;
+    } 
+  }
 }
 
 bool checkForObject()
@@ -315,8 +463,10 @@ bool checkForObject()
   {
     /* Do nothing here as returning */
   }
-  
+
   motors.setSpeeds(0, 0);
+  if (found == false)
+    Serial.println("No objects found.");
   return found;
 }
 
@@ -409,61 +559,6 @@ bool isWallFound()
 
   /* Return true if more than one sensor detects a line */
   return (detectCount>1);
-}
-
-void robotForward()
-{
-  Serial.println("Robot moving forwards");
-  motors.setSpeeds(MAX_SPEED, MAX_SPEED);
-
-  /* Set values needed for collision detection */
-  currMovement = FORWARD;
-  lastLeftSpeed = MAX_SPEED;
-  lastRightSpeed = MAX_SPEED; 
-}
-
-void robotBackward()
-{
-  Serial.println("Robot moving backwards");
-  motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
-
-  /* Set values needed for collision detection */
-  currMovement = BACKWARD;
-  lastLeftSpeed = -MAX_SPEED;
-  lastRightSpeed = -MAX_SPEED; 
-}
-
-void turnLeft()
-{
-  Serial.println("Robot turning left");
-  motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-
-  /* Set values needed for collision detection */
-  currMovement = LEFT;
-  lastLeftSpeed = -MAX_SPEED;
-  lastRightSpeed = MAX_SPEED; 
-}
-
-void turnRight()
-{
-  Serial.println("Robot turning right");
-  motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-
-  /* Set values needed for collision detection */
-    currMovement = RIGHT;
-  lastLeftSpeed = MAX_SPEED;
-  lastRightSpeed = -MAX_SPEED; 
-}
-
-void robotStop()
-{
-  Serial.println("Robot stopping");
-  motors.setSpeeds(0, 0);
-
-  /* Set values needed for collision detection */
-  currMovement = NONE;
-  lastLeftSpeed = 0;
-  lastRightSpeed = 0; 
 }
 
 void calibrateSensors()
