@@ -207,7 +207,7 @@ void parseGuidedNavigate(char recv)
     case CHAR_AUTONOMOUS:
     {
       robotMode = AUTONOMOUS_NAVIGATE;
-      Serial.println("Autonomous mode started");
+      Serial.println("Autonomous mode started, press anything to begin");
       break;
     }
   }
