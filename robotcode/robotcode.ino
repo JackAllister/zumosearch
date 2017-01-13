@@ -161,7 +161,8 @@ void loop()
       /* Wait until receive byte found */
       if (recvByte != 0)
       {
-        
+        Serial.println("DEBUG");
+        runAutonomousMode();
       }
       break;
     }
@@ -286,16 +287,22 @@ void runAutonomousMode()
   MOVEMENT inverse;
   unsigned long startTime;
 
-  for (i = movLogCount; i = -1; i++)
+  for (i = movLogCount; i != -1; i--)
   {
-    inverse = findInverse(movLog[i].movement);
-  
-    /* Move in inverse direction to backtrace */
-    startTime = millis();
-    moveDirection(inverse);
-    while (millis() - startTime < movLog[i].time)
-    {
-      /* Do nothing */
+    Serial.print("Doing log: ");
+    Serial.println(i);
+    
+    if (movLog[i].movement != NONE)
+    {      
+      inverse = findInverse(movLog[i].movement);
+    
+      /* Move in inverse direction to backtrace */
+      startTime = millis();
+      moveDirection(inverse);
+      while (millis() - startTime < movLog[i].time)
+      {
+        /* Do nothing */
+      }
     }
   }
   moveDirection(NONE);
@@ -338,6 +345,22 @@ MOVEMENT findInverse(MOVEMENT movement)
 
 void moveDirection(MOVEMENT movement)
 {
+  /* Method for storing coordinates in guided mode */
+  if (robotMode == GUIDED_NAVIGATE)
+  {
+    /* Set movement and start time */
+    unsigned long currTime = millis();
+    movLog[movLogCount].movement = movement;
+    movLog[movLogCount].time = currTime;
+
+    /* Here we correct previous log time so that it is delta/diff */
+    if (movLogCount != 0)
+    {
+      movLog[movLogCount-1].time = currTime - movLog[movLogCount-1].time;
+    }
+    movLogCount++;
+  }
+  
   switch (movement)
   {
     case FORWARD:
