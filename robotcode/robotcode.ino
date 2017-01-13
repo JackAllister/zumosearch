@@ -7,6 +7,7 @@
 #include <ZumoMotors.h>
 #include <QTRSensors.h>
 #include <ZumoReflectanceSensorArray.h>
+#include <NewPing.h>
 
 /* Module typedefs */
 typedef enum
@@ -27,6 +28,9 @@ typedef enum
 
 /* Module constants */
 #define NUM_SENSORS 6
+#define TRIGGER_PIN 2
+#define ECHO_PIN 3
+#define MAX_DISTANCE 20 /* maximum 20cm */
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
@@ -43,6 +47,7 @@ static const int MAX_SPEED = 120;
 /* Module variables */
 ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
+NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 MOVEMENT currMovement = NONE;
@@ -181,7 +186,16 @@ void parseSearchRoom(char recv)
     case CHAR_CHECK_ROOM:
     {
       Serial.println("Checking room for objects");
-      /* Perform a quick scan of the room using US to find items */
+      /* Perform a quick scan of the room using US to find items */        
+      do
+      {
+        delay(50);
+        Serial.print("Ping: ");
+        Serial.print(sonar.ping_cm());
+        Serial.println("cm");
+         
+      } while (true);
+      
       break;
     }
 
