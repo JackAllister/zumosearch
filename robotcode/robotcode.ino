@@ -40,10 +40,11 @@ typedef struct
 #define ECHO_PIN 3
 #define MAX_DISTANCE 20
 
-#define MAX_COORDINATES 30
+#define MAX_COORDINATES 50
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
+static const char CHAR_START_AUTONOMOUS = '3';
 static const char CHAR_WALL_DETECT = 'C';
 static const char CHAR_ROOM = 'R';
 static const char CHAR_AUTONOMOUS = 'E';
@@ -158,11 +159,12 @@ void loop()
 
     case AUTONOMOUS_NAVIGATE:
     {
-      /* Wait until receive byte found */
       if (recvByte != 0)
       {
-        Serial.println("DEBUG");
-        runAutonomousMode();
+        if (parseMovement(recvByte) == false)
+        {
+          parseAutonomous(recvByte);
+        }
       }
       break;
     }
@@ -207,7 +209,7 @@ void parseGuidedNavigate(char recv)
     case CHAR_AUTONOMOUS:
     {
       robotMode = AUTONOMOUS_NAVIGATE;
-      Serial.println("Autonomous mode started, press anything to begin");
+      Serial.println("Autonomous mode started, rotate 180* then press 3");
       break;
     }
   }
@@ -230,6 +232,25 @@ void parseSearchRoom(char recv)
       break;
     }
   } 
+}
+
+void parseAutonomous(char recv)
+{
+  switch (recv)
+  {
+    case CHAR_START_AUTONOMOUS:
+    {
+      runAutonomousMode();
+      break;
+    }
+
+    case CHAR_AUTONOMOUS:
+    {
+      robotMode = GUIDED_NAVIGATE;
+      Serial.println("Leaving autonomous mode, going back to guided");
+      break;
+    }
+  }
 }
 
 bool parseMovement(char recv)
@@ -286,6 +307,7 @@ void runAutonomousMode()
   int i = 0;
   MOVEMENT inverse;
   unsigned long startTime;
+  bool corrected;
 
   for (i = movLogCount; i != -1; i--)
   {
@@ -294,6 +316,7 @@ void runAutonomousMode()
     
     if (movLog[i].movement != NONE)
     {      
+      corrected = false;
       inverse = findInverse(movLog[i].movement);
     
       /* Move in inverse direction to backtrace */
@@ -301,7 +324,14 @@ void runAutonomousMode()
       moveDirection(inverse);
       while (millis() - startTime < movLog[i].time)
       {
-        /* Do nothing */
+        if ((corrected == false) && (correctPath() == true))
+        {
+          Serial.print("Path corrected, wheels speeds: ");
+          Serial.print(lastLeftSpeed);
+          Serial.print(' ');
+          Serial.println(lastRightSpeed);
+          corrected = true;
+        } 
       }
     }
   }
@@ -316,13 +346,13 @@ MOVEMENT findInverse(MOVEMENT movement)
   {
     case FORWARD:
     {
-      result = BACKWARD;
+      result = FORWARD;
       break;
     }
 
     case BACKWARD:
     {
-      result = FORWARD;
+      result = BACKWARD;
       break;
     }
 
