@@ -28,6 +28,7 @@ typedef enum
 
 typedef struct
 {
+  OPERATING_MODE mode;
   MOVEMENT movement;
   unsigned long time;
 } MOVEMENT_COORD;
@@ -69,7 +70,7 @@ bool wallDetect = true;
 int roomCount = 0;
 
 /* Array of directions used for autonomous mode */
-MOVEMENT_COORD movLog[MAX_COORDINATES] = {NONE, 0};
+MOVEMENT_COORD movLog[MAX_COORDINATES];
 int movLogCount = 0;
 
 /* Module prototypes */
@@ -78,7 +79,7 @@ void parseSearchRoom(char recv);
 bool parseMovement(char recv);
 
 void runAutonomousMode();
-MOVEMENT findInverse(MOVEMENT movement);
+MOVEMENT calcMovement(MOVEMENT_COORD mov);
 void moveDirection(MOVEMENT movement);
 
 bool checkForObject();
@@ -319,7 +320,7 @@ void runAutonomousMode()
     if ((movLog[i].time >= MIN_LOG_TIME) &&
         (movLog[i].time <= MAX_LOG_TIME))
     {      
-      inverse = findInverse(movLog[i].movement);
+      inverse = calcMovement(movLog[i]);
     
       /* Move in inverse direction to backtrace */
       startTime = millis();
@@ -340,33 +341,45 @@ void runAutonomousMode()
   moveDirection(NONE);
 }
 
-MOVEMENT findInverse(MOVEMENT movement)
+MOVEMENT calcMovement(MOVEMENT_COORD mov)
 {
   MOVEMENT result = NONE;
   
-  switch (movement)
+  switch (mov.movement)
   {
     case FORWARD:
     {
-      result = FORWARD;
+      if (mov.mode == SEARCH_ROOM)
+        result = BACKWARD;
+      else
+        result = FORWARD;
       break;
     }
 
     case BACKWARD:
     {
-      result = BACKWARD;
+      if (mov.mode == SEARCH_ROOM)
+        result = FORWARD;
+      else
+        result = BACKWARD;
       break;
     }
 
     case LEFT:
     {
-      result = RIGHT;
+      if (mov.mode == SEARCH_ROOM)
+        result = LEFT;
+      else
+        result = RIGHT;
       break;
     }
 
     case RIGHT:
     {
-      result = LEFT;
+      if (mov.mode == SEARCH_ROOM)
+        result = RIGHT;
+      else
+        result = LEFT;
       break;
     }
   }
@@ -378,10 +391,11 @@ MOVEMENT findInverse(MOVEMENT movement)
 void moveDirection(MOVEMENT movement)
 {
   /* Method for storing coordinates in guided mode */
-  if (robotMode == GUIDED_NAVIGATE)
+  if (robotMode != AUTONOMOUS_NAVIGATE)
   {
     /* Set movement and start time */
     unsigned long currTime = millis();
+    movLog[movLogCount].mode = robotMode;
     movLog[movLogCount].movement = movement;
     movLog[movLogCount].time = currTime;
 
