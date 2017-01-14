@@ -40,7 +40,7 @@ typedef struct
 #define ECHO_PIN 3
 #define MAX_DISTANCE 20
 
-#define MAX_COORDINATES 80
+#define MAX_COORDINATES 60
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
@@ -61,19 +61,15 @@ ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 
-/* Array of directions used for autonomous mode */
-MOVEMENT_COORD movLog[MAX_COORDINATES] = {NONE, 0};
-int movLogCount = 0;
-
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 MOVEMENT currMovement = NONE;
 bool wallDetect = true;
 
-/* Speeds used for path correction */
-int lastLeftSpeed = 0;
-int lastRightSpeed = 0;
-
 int roomCount = 0;
+
+/* Array of directions used for autonomous mode */
+MOVEMENT_COORD movLog[MAX_COORDINATES] = {NONE, 0};
+int movLogCount = 0;
 
 /* Module prototypes */
 void parseGuidedNavigate(char recv);
@@ -87,6 +83,7 @@ void moveDirection(MOVEMENT movement);
 bool checkForObject();
 bool correctPath();
 bool isWallFound();
+int isSensorsOver(int startSensor, int endSensor);
 void calibrateSensors();
 
 /* Module code */
@@ -132,14 +129,11 @@ void loop()
             Serial.println("Wall found, press C to re-enable when moved.");
             wallDetect = false;
           }
-          else if (correctPath() == true)
+          else
           {
             /* Only correct the path if a wall has not been found */
-            Serial.print("Path corrected, wheels speeds: ");
-            Serial.print(lastLeftSpeed);
-            Serial.print(' ');
-            Serial.println(lastRightSpeed);
-          } 
+            correctPath();
+          }    
         }
       }        
       break;
@@ -328,13 +322,11 @@ void runAutonomousMode()
           {
             motors.setSpeeds(0, 0);
           }
-          else if (correctPath() == true)
+          else
           {
-            Serial.print("Path corrected, wheels speeds: ");
-            Serial.print(lastLeftSpeed);
-            Serial.print(' ');
-            Serial.println(lastRightSpeed);
-          } 
+            /* Only correct the path if a wall has not been found */
+            correctPath();
+          }  
         }
       }
     }
@@ -399,49 +391,41 @@ void moveDirection(MOVEMENT movement)
   {
     case FORWARD:
     {
-      Serial.println("Robot moving forwards");
-      motors.setSpeeds(MAX_SPEED, MAX_SPEED);
-    
       /* Set values needed for collision detection */
       currMovement = FORWARD;
-      lastLeftSpeed = MAX_SPEED;
-      lastRightSpeed = MAX_SPEED;
+      
+      Serial.println("Robot moving forwards");
+      motors.setSpeeds(MAX_SPEED, MAX_SPEED);
       break; 
     }
 
     case BACKWARD:
     {
-      Serial.println("Robot moving backwards");
-      motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
-      
       /* Set values needed for collision detection */
       currMovement = BACKWARD;
-      lastLeftSpeed = -MAX_SPEED;
-      lastRightSpeed = -MAX_SPEED; 
+      
+      Serial.println("Robot moving backwards");
+      motors.setSpeeds(-MAX_SPEED, -MAX_SPEED);
       break;
     }
 
     case LEFT:
     {
+      /* Set values needed for collision detection */
+      currMovement = LEFT; 
+      
       Serial.println("Robot turning left");
       motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
-    
-      /* Set values needed for collision detection */
-      currMovement = LEFT;
-      lastLeftSpeed = -MAX_SPEED;
-      lastRightSpeed = MAX_SPEED; 
       break;
     }
 
     case RIGHT:
     {
-      Serial.println("Robot turning right");
-      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
-    
       /* Set values needed for collision detection */
       currMovement = RIGHT;
-      lastLeftSpeed = MAX_SPEED;
-      lastRightSpeed = -MAX_SPEED; 
+      
+      Serial.println("Robot turning right");
+      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
       break;
     }
 
@@ -452,8 +436,6 @@ void moveDirection(MOVEMENT movement)
     
       /* Set values needed for collision detection */
       currMovement = NONE;
-      lastLeftSpeed = 0;
-      lastRightSpeed = 0; 
       break;
     } 
   }
@@ -530,12 +512,13 @@ bool checkForObject()
 bool correctPath()
 {
   static const unsigned long CORR_INTERVAL = 50;
-  static const int LEFT_SENSOR = 0;
-  static const int RIGHT_SENSOR = 5;
+  static const int LEFT_SENSOR_START = 0;
+  static const int LEFT_SENSOR_END = 1;
+  static const int RIGHT_SENSOR_START = 4;
+  static const int RIGHT_SENSOR_END = 5;
   static const int LINE_VALUE = 400;
 
   static unsigned long lastRun = 0;
-  unsigned int sensorValues[NUM_SENSORS];
   bool result = false;
   MOVEMENT lastMovement;
 
@@ -546,42 +529,31 @@ bool correctPath()
   {
     lastRun = millis();
     
-    reflectanceSensors.readLine(sensorValues);
     
-    if (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
+    if (isSensorsOver(LEFT_SENSOR_START, LEFT_SENSOR_END) > 0)
     {
-      motors.setSpeeds(0, 0);
-      while (sensorValues[LEFT_SENSOR] >= LINE_VALUE)
+      motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
+      do
       {
-        motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
         
-        reflectanceSensors.readLine(sensorValues);
-      }
-      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+      } while (isSensorsOver(LEFT_SENSOR_START, LEFT_SENSOR_END) > 0);
+      motors.setSpeeds(MAX_SPEED, MAX_SPEED);
       
       /* If far left sensor on a line correct path a little */
-      Serial.print("Corrected left: ");
-      Serial.print(lastLeftSpeed);
-      Serial.print(" ");
-      Serial.println(lastRightSpeed);
+      Serial.println("Corrected left");
       result = true;
     }
-    else if (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+    else if (isSensorsOver(RIGHT_SENSOR_START, RIGHT_SENSOR_END) > 0)
     {
-      motors.setSpeeds(0, 0);
-      while (sensorValues[RIGHT_SENSOR] >= LINE_VALUE)
+      motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
+      do
       {
-        motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
         
-        reflectanceSensors.readLine(sensorValues);
-      }
-      motors.setSpeeds(lastLeftSpeed, lastRightSpeed);
+      } while (isSensorsOver(RIGHT_SENSOR_START, RIGHT_SENSOR_END) > 0);
+      motors.setSpeeds(MAX_SPEED, MAX_SPEED);
   
       /* If far right sensor on a line correct path a little */
-      Serial.print("Corrected right: ");
-      Serial.print(lastLeftSpeed);
-      Serial.print(" ");
-      Serial.println(lastRightSpeed);
+      Serial.println("Corrected right.");
       result = true;
     }
   }
@@ -591,32 +563,36 @@ bool correctPath()
 
 bool isWallFound()
 {
-  static const int LINE_VALUE = 400;
-  
-  unsigned int sensorValues[NUM_SENSORS];
-  int i;
-  int detectCount = 0;
+  static const int START_SENSOR = 2;
+  static const int END_SENSOR = 3;
 
-  reflectanceSensors.readLine(sensorValues);
-
-//  for (i = 0; i < NUM_SENSORS; i++)
-//  {
-//    Serial.print(sensorValues[i]);
-//    Serial.print(' ');
-//  }
-//  Serial.println();
-
-  /* Check sensors 0-6 to see if wall detected */
-  for (i = 0; i < NUM_SENSORS; i++)
-  {
-    if (sensorValues[i] >= LINE_VALUE)
-    {
-      detectCount++;
-    }
-  }
+  int sensorCount = isSensorsOver(START_SENSOR, END_SENSOR);
 
   /* Return true if more than one sensor detects a line */
-  return (detectCount>1);
+  return (sensorCount>1);
+}
+
+int isSensorsOver(int startSensor, int endSensor)
+{
+  static const int LINE_VALUE = 400;
+  
+  int sensorCount = 0;
+  unsigned int sensorValues[NUM_SENSORS];
+  int i;
+
+  reflectanceSensors.readLine(sensorValues);
+  
+  for (i = startSensor; i <= endSensor; i++)
+  {
+//    Serial.print(sensorValues[i]);
+//    Serial.print(' ');
+    
+    if (sensorValues[i] >= LINE_VALUE)
+      sensorCount++;
+  }
+//  Serial.println();
+
+  return sensorCount;
 }
 
 void calibrateSensors()
