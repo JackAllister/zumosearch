@@ -23,6 +23,7 @@ typedef enum
   BACKWARD,
   LEFT,
   RIGHT,
+  SEARCH,
   NONE
 } MOVEMENT;
 
@@ -316,27 +317,33 @@ void runAutonomousMode()
   {
     Serial.print("Running action: ");
     Serial.println(i);
-    
-    if ((movLog[i].time >= MIN_LOG_TIME) &&
-        (movLog[i].time <= MAX_LOG_TIME))
-    {      
-      inverse = calcMovement(movLog[i]);
-    
-      /* Move in inverse direction to backtrace */
-      startTime = millis();
-      moveDirection(inverse);
-      while (millis() - startTime < movLog[i].time)
-      {
-        if (inverse == FORWARD)
-        {     
-          if (isWallFound() == false)
-            correctPath();
-          else
-            break;
+
+    /* Check to see if relates to a search or movmeent */
+    if (movLog[i].movement != SEARCH)
+    {
+      if ((movLog[i].time >= MIN_LOG_TIME) &&
+          (movLog[i].time <= MAX_LOG_TIME))
+      {      
+        inverse = calcMovement(movLog[i]);
+      
+        /* Move in inverse direction to backtrace */
+        startTime = millis();
+        moveDirection(inverse);
+        while (millis() - startTime < movLog[i].time)
+        {
+          if (inverse == FORWARD)
+          {     
+            if (isWallFound() == false)
+              correctPath();
+            else
+              break;
+          }
         }
+        motors.setSpeeds(0, 0);
       }
-      motors.setSpeeds(0, 0);
     }
+    else
+      checkForObject();
   }
   moveDirection(NONE);
 }
@@ -390,7 +397,7 @@ MOVEMENT calcMovement(MOVEMENT_COORD mov)
 
 void moveDirection(MOVEMENT movement)
 {
-  /* Method for storing coordinates in guided mode */
+  /* Method for storing movement coordinates */
   if (robotMode != AUTONOMOUS_NAVIGATE)
   {
     /* Set movement and start time */
@@ -468,6 +475,23 @@ bool checkForObject()
   bool found = false;
   unsigned long startTime;
   unsigned long pingDist;
+
+  /* Method for storing movement coordinates */
+  if (robotMode != AUTONOMOUS_NAVIGATE)
+  {
+    /* Set movement and start time */
+    unsigned long currTime = millis();
+    movLog[movLogCount].mode = robotMode;
+    movLog[movLogCount].movement = SEARCH;
+    movLog[movLogCount].time = currTime;
+
+    /* Here we correct previous log time so that it is delta/diff */
+    if (movLogCount != 0)
+    {
+      movLog[movLogCount-1].time = currTime - movLog[movLogCount-1].time;
+    }
+    movLogCount++;
+  }
   
   Serial.println("Checking room for objects");
   /* Perform a quick scan of the room using US to find items */ 
