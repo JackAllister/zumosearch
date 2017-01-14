@@ -33,6 +33,7 @@ typedef struct
 } MOVEMENT_COORD;
 
 /* Module constants */
+#define LED_PIN 13
 #define NUM_SENSORS 6
 
 /* Ultrasonic sensor */
@@ -95,6 +96,9 @@ void setup()
 
   /* Make sure the robot is not moving */
   motors.setSpeeds(0, 0);
+
+  /* Initialise LED pin */
+  pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() 
@@ -203,6 +207,7 @@ void parseGuidedNavigate(char recv)
     case CHAR_AUTONOMOUS:
     {
       robotMode = AUTONOMOUS_NAVIGATE;
+      digitalWrite(LED_PIN, HIGH);
       Serial.println("Autonomous mode started, rotate 180* then press 3");
       break;
     }
@@ -241,6 +246,7 @@ void parseAutonomous(char recv)
     case CHAR_AUTONOMOUS:
     {
       robotMode = GUIDED_NAVIGATE;
+      digitalWrite(LED_PIN, LOW);
       Serial.println("Leaving autonomous mode, going back to guided");
       break;
     }
