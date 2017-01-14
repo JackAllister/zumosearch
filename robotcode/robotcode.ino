@@ -325,18 +325,18 @@ void runAutonomousMode()
       while (millis() - startTime < movLog[i].time)
       {
         if (inverse == FORWARD)
-        {
-          if (isWallFound() == true)
-          {
-            motors.setSpeeds(0, 0);
-          }
-          else
-          {
-            /* Only correct the path if a wall has not been found */
+        {     
+          if (isWallFound() == false)
             correctPath();
-          }  
+          else
+            break;
+        }
+        else
+        {
+          correctPath();
         }
       }
+      motors.setSpeeds(0, 0);
     }
   }
   moveDirection(NONE);
@@ -520,10 +520,8 @@ bool checkForObject()
 bool correctPath()
 {
   static const unsigned long CORR_INTERVAL = 50;
-  static const int LEFT_SENSOR_START = 0;
-  static const int LEFT_SENSOR_END = 1;
-  static const int RIGHT_SENSOR_START = 4;
-  static const int RIGHT_SENSOR_END = 5;
+  static const int LEFT_START = 0;
+  static const int RIGHT_START = 5;
   static const int LINE_VALUE = 400;
 
   static unsigned long lastRun = 0;
@@ -537,26 +535,28 @@ bool correctPath()
   {
     lastRun = millis();
     
-    if (isSensorsOver(LEFT_SENSOR_START, LEFT_SENSOR_END) > 0)
+    if ((isSensorsOver(LEFT_START, LEFT_START) > 0) &&
+        (isSensorsOver(RIGHT_START, RIGHT_START) == 0))
     {
       motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
       do
       {
         
-      } while (isSensorsOver(LEFT_SENSOR_START, LEFT_SENSOR_END) > 0);
+      } while (isSensorsOver(LEFT_START, LEFT_START) > 0);
       motors.setSpeeds(MAX_SPEED, MAX_SPEED);
       
       /* If far left sensor on a line correct path a little */
       Serial.println("Corrected left");
       result = true;
     }
-    else if (isSensorsOver(RIGHT_SENSOR_START, RIGHT_SENSOR_END) > 0)
+    else if ((isSensorsOver(RIGHT_START, RIGHT_START) > 0) &&
+             (isSensorsOver(LEFT_START, LEFT_START) == 0))
     {
       motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
       do
       {
         
-      } while (isSensorsOver(RIGHT_SENSOR_START, RIGHT_SENSOR_END) > 0);
+      } while (isSensorsOver(RIGHT_START, RIGHT_START) > 0);
       motors.setSpeeds(MAX_SPEED, MAX_SPEED);
   
       /* If far right sensor on a line correct path a little */
@@ -570,18 +570,18 @@ bool correctPath()
 
 bool isWallFound()
 {
-  static const int START_SENSOR = 2;
-  static const int END_SENSOR = 3;
+  static const int START_SENSOR = 0;
+  static const int END_SENSOR = 5;
 
   int sensorCount = isSensorsOver(START_SENSOR, END_SENSOR);
 
   /* Return true if more than one sensor detects a line */
-  return (sensorCount>1);
+  return (sensorCount >= 2);
 }
 
 int isSensorsOver(int startSensor, int endSensor)
 {
-  static const int LINE_VALUE = 400;
+  static const int LINE_VALUE = 200;
   
   int sensorCount = 0;
   unsigned int sensorValues[NUM_SENSORS];
@@ -590,14 +590,10 @@ int isSensorsOver(int startSensor, int endSensor)
   reflectanceSensors.readLine(sensorValues);
   
   for (i = startSensor; i <= endSensor; i++)
-  {
-//    Serial.print(sensorValues[i]);
-//    Serial.print(' ');
-    
+  {    
     if (sensorValues[i] >= LINE_VALUE)
       sensorCount++;
   }
-//  Serial.println();
 
   return sensorCount;
 }
