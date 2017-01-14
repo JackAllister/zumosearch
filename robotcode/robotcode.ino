@@ -297,17 +297,19 @@ bool parseMovement(char recv)
 }
 
 void runAutonomousMode()
-{
+{  
+  static const int MIN_LOG_TIME = 400;
+  
   int i = 0;
   MOVEMENT inverse;
   unsigned long startTime;
 
   for (i = movLogCount; i != -1; i--)
   {
-    Serial.print("Doing log: ");
+    Serial.print("Running action: ");
     Serial.println(i);
     
-    if (movLog[i].movement != NONE)
+    if (movLog[i].movement != NONE && (movLog[i].time >= MIN_LOG_TIME))
     {      
       inverse = findInverse(movLog[i].movement);
     
@@ -528,7 +530,6 @@ bool correctPath()
   if ((lastRun == 0) || (millis() - lastRun > CORR_INTERVAL))
   {
     lastRun = millis();
-    
     
     if (isSensorsOver(LEFT_SENSOR_START, LEFT_SENSOR_END) > 0)
     {
