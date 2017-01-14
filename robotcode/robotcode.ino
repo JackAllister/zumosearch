@@ -32,6 +32,8 @@ typedef struct
   OPERATING_MODE mode;
   MOVEMENT movement;
   unsigned long time;
+  
+  int roomID; /* -1 for corridor */
 } MOVEMENT_COORD;
 
 /* Module constants */
@@ -44,6 +46,7 @@ typedef struct
 #define MAX_DISTANCE 20
 
 #define MAX_COORDINATES 60
+#define MAX_ROOMS 5
 
 static const char CHAR_CALIBRATE = '1';
 static const char CHAR_CHECK_ROOM = '2';
@@ -68,7 +71,9 @@ OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 MOVEMENT currMovement = NONE;
 bool wallDetect = true;
 
+/* counter for rooms, also an array of boolean to show object found */
 int roomCount = 0;
+bool roomFound[MAX_ROOMS] = {false, false, false, false, false};
 
 /* Array of directions used for autonomous mode */
 MOVEMENT_COORD movLog[MAX_COORDINATES];
@@ -318,32 +323,35 @@ void runAutonomousMode()
     Serial.print("Running action: ");
     Serial.println(i);
 
-    /* Check to see if relates to a search or movmeent */
-    if (movLog[i].movement != SEARCH)
+    if ((movLog[i].mode != SEARCH_ROOM) || (roomFound[movLog[i].roomID] == true))
     {
-      if ((movLog[i].time >= MIN_LOG_TIME) &&
-          (movLog[i].time <= MAX_LOG_TIME))
-      {      
-        inverse = calcMovement(movLog[i]);
-      
-        /* Move in inverse direction to backtrace */
-        startTime = millis();
-        moveDirection(inverse);
-        while (millis() - startTime < movLog[i].time)
-        {
-          if (inverse == FORWARD)
-          {     
-            if (isWallFound() == false)
-              correctPath();
-            else
-              break;
+      /* Check to see if relates to a search or movmeent */
+      if (movLog[i].movement != SEARCH)
+      {
+        if ((movLog[i].time >= MIN_LOG_TIME) &&
+            (movLog[i].time <= MAX_LOG_TIME))
+        {      
+          inverse = calcMovement(movLog[i]);
+        
+          /* Move in inverse direction to backtrace */
+          startTime = millis();
+          moveDirection(inverse);
+          while (millis() - startTime < movLog[i].time)
+          {
+            if (inverse == FORWARD)
+            {     
+              if (isWallFound() == false)
+                correctPath();
+              else
+                break;
+            }
           }
+          motors.setSpeeds(0, 0);
         }
-        motors.setSpeeds(0, 0);
       }
+      else
+        checkForObject();
     }
-    else
-      checkForObject();
   }
   moveDirection(NONE);
 }
@@ -405,6 +413,15 @@ void moveDirection(MOVEMENT movement)
     movLog[movLogCount].mode = robotMode;
     movLog[movLogCount].movement = movement;
     movLog[movLogCount].time = currTime;
+
+    /* 
+     * If we movement is in search mode we note down the room.
+     * If not we just put -1 to signal it is a corridor
+     */
+    if (robotMode == SEARCH_ROOM)
+      movLog[movLogCount].roomID = roomCount;
+    else
+      movLog[movLogCount].roomID = -1;
 
     /* Here we correct previous log time so that it is delta/diff */
     if (movLogCount != 0)
@@ -475,23 +492,6 @@ bool checkForObject()
   bool found = false;
   unsigned long startTime;
   unsigned long pingDist;
-
-  /* Method for storing movement coordinates */
-  if (robotMode != AUTONOMOUS_NAVIGATE)
-  {
-    /* Set movement and start time */
-    unsigned long currTime = millis();
-    movLog[movLogCount].mode = robotMode;
-    movLog[movLogCount].movement = SEARCH;
-    movLog[movLogCount].time = currTime;
-
-    /* Here we correct previous log time so that it is delta/diff */
-    if (movLogCount != 0)
-    {
-      movLog[movLogCount-1].time = currTime - movLog[movLogCount-1].time;
-    }
-    movLogCount++;
-  }
   
   Serial.println("Checking room for objects");
   /* Perform a quick scan of the room using US to find items */ 
@@ -550,6 +550,26 @@ bool checkForObject()
   motors.setSpeeds(0, 0);
   if (found == false)
     Serial.println("No objects found.");
+
+  /* Method for storing movement coordinates */
+  if (robotMode != AUTONOMOUS_NAVIGATE)
+  {
+    /* Set movement and start time */
+    unsigned long currTime = millis();
+    movLog[movLogCount].mode = robotMode;
+    movLog[movLogCount].movement = SEARCH;
+    movLog[movLogCount].time = currTime;
+    movLog[movLogCount].roomID = roomCount;
+
+    /* Here we correct previous log time so that it is delta/diff */
+    if (movLogCount != 0)
+    {
+      movLog[movLogCount-1].time = currTime - movLog[movLogCount-1].time;
+    }
+    movLogCount++;
+  }
+
+  roomFound[roomCount] = found;
   return found;
 }
 
