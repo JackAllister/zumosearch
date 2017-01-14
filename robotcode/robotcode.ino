@@ -305,6 +305,7 @@ bool parseMovement(char recv)
 void runAutonomousMode()
 {  
   static const int MIN_LOG_TIME = 400;
+  static const int MAX_LOG_TIME = 8000;
   
   int i = 0;
   MOVEMENT inverse;
@@ -315,7 +316,8 @@ void runAutonomousMode()
     Serial.print("Running action: ");
     Serial.println(i);
     
-    if (movLog[i].movement != NONE && (movLog[i].time >= MIN_LOG_TIME))
+    if ((movLog[i].time >= MIN_LOG_TIME) &&
+        (movLog[i].time <= MAX_LOG_TIME))
     {      
       inverse = findInverse(movLog[i].movement);
     
@@ -330,10 +332,6 @@ void runAutonomousMode()
             correctPath();
           else
             break;
-        }
-        else
-        {
-          correctPath();
         }
       }
       motors.setSpeeds(0, 0);
@@ -522,7 +520,6 @@ bool correctPath()
   static const unsigned long CORR_INTERVAL = 50;
   static const int LEFT_START = 0;
   static const int RIGHT_START = 5;
-  static const int LINE_VALUE = 400;
 
   static unsigned long lastRun = 0;
   bool result = false;
@@ -576,12 +573,12 @@ bool isWallFound()
   int sensorCount = isSensorsOver(START_SENSOR, END_SENSOR);
 
   /* Return true if more than one sensor detects a line */
-  return (sensorCount >= 2);
+  return (sensorCount > 1);
 }
 
 int isSensorsOver(int startSensor, int endSensor)
 {
-  static const int LINE_VALUE = 200;
+  static const int LINE_VALUE = 300;
   
   int sensorCount = 0;
   unsigned int sensorValues[NUM_SENSORS];
