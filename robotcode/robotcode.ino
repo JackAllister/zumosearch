@@ -9,7 +9,7 @@
 #include <ZumoReflectanceSensorArray.h>
 #include <NewPing.h>
 
-/* Module typedefs */
+/********************** Module typedefs **********************/
 typedef enum
 {
   GUIDED_NAVIGATE,
@@ -36,7 +36,7 @@ typedef struct
   int roomID; /* -1 for corridor */
 } MOVEMENT_COORD;
 
-/* Module constants */
+/********************** Module constants **********************/
 #define LED_PIN 13
 #define NUM_SENSORS 6
 
@@ -47,26 +47,29 @@ typedef struct
 
 #define MAX_COORDINATES 60
 #define MAX_ROOMS 5
+#define MAX_SPEED 120
 
-static const char CHAR_CALIBRATE = '1';
-static const char CHAR_CHECK_ROOM = '2';
-static const char CHAR_START_AUTONOMOUS = '3';
-static const char CHAR_WALL_DETECT = 'C';
-static const char CHAR_ROOM = 'R';
-static const char CHAR_AUTONOMOUS = 'E';
-static const char CHAR_FORWARD = 'W';
-static const char CHAR_BACKWARD = 'S';
-static const char CHAR_LEFT = 'A';
-static const char CHAR_RIGHT = 'D';
-static const char CHAR_STOP = 0x20;
+/* Keypress characters */
+#define CHAR_CALIBRATE '1'
+#define CHAR_CHECK_ROOM '2'
+#define CHAR_START_AUTONOMOUS '3'
+#define CHAR_WALL_DETECT 'C'
+#define CHAR_ROOM 'R'
+#define CHAR_AUTONOMOUS 'E'
+#define CHAR_FORWARD 'W'
+#define CHAR_BACKWARD 'S'
+#define CHAR_LEFT 'A'
+#define CHAR_RIGHT 'D'
+#define CHAR_STOP 0x20
 
-static const int MAX_SPEED = 120;
+/********************** Module variables **********************/
 
-/* Module variables */
+/* Variables relating to the robot for control */
 ZumoMotors motors;
 ZumoReflectanceSensorArray reflectanceSensors;
 NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE);
 
+/* Operating mode */
 OPERATING_MODE robotMode = GUIDED_NAVIGATE;
 MOVEMENT currMovement = NONE;
 bool wallDetect = true;
@@ -79,7 +82,7 @@ bool roomFound[MAX_ROOMS] = {false, false, false, false, false};
 MOVEMENT_COORD movLog[MAX_COORDINATES];
 int movLogCount = 0;
 
-/* Module prototypes */
+/********************** Module prototypes **********************/
 void parseGuidedNavigate(char recv);
 void parseSearchRoom(char recv);
 bool parseMovement(char recv);
@@ -94,11 +97,13 @@ bool isWallFound();
 int isSensorsOver(int startSensor, int endSensor);
 void calibrateSensors();
 
-/* Module code */
+/********************** Module code **********************/
 void setup() 
 {
+  /* Initialise serial needed for wireless coms via XBee */
   Serial.begin(9600);
 
+  /* Initialise reflectance sensors for wall detection */
   reflectanceSensors.init();
 
   /* Make sure the robot is not moving */
@@ -115,6 +120,7 @@ void loop()
   /* Check serial to see if we have received any commands */
   if (Serial.available() != 0)
   {
+    /* Convert to upper case so command 'e' is same as 'E' */
     recvByte = toupper(Serial.read());
   }
   
@@ -124,8 +130,10 @@ void loop()
     {
       if (recvByte != 0)
       {
+        /* Check if received byte is a movement character */
         if (parseMovement(recvByte) == false)
         {
+          /* If not equal to movement character parse other characters */
           parseGuidedNavigate(recvByte);
         }
       }
@@ -134,6 +142,12 @@ void loop()
       {
         if (wallDetect == true)
         {
+          /* 
+           * Wall detection and path correction only work if enabled and 
+           * zumo going forward. This is because there is no point having
+           * the zumo use its sensors if travelling backwards as none on
+           * rear side.
+           */
           if (isWallFound() == true)
           {
             moveDirection(NONE);
@@ -154,6 +168,7 @@ void loop()
     {
       if (recvByte != 0)
       {
+        /* Again parse movement and other room search mode commands */
         if (parseMovement(recvByte) == false)
         {
           parseSearchRoom(recvByte);
@@ -166,6 +181,7 @@ void loop()
     {
       if (recvByte != 0)
       {
+        /* Again parse movement and other autonomous commands (start/leavemode) */
         if (parseMovement(recvByte) == false)
         {
           parseAutonomous(recvByte);
@@ -315,7 +331,7 @@ void runAutonomousMode()
   static const int MAX_LOG_TIME = 8000;
   
   int i = 0;
-  MOVEMENT inverse;
+  MOVEMENT nextMovement;
   unsigned long startTime;
 
   for (i = movLogCount; i != -1; i--)
@@ -323,6 +339,7 @@ void runAutonomousMode()
     Serial.print("Running action: ");
     Serial.println(i);
 
+    /* This if statement eliminates any possible 'empty' rooms from route back */
     if ((movLog[i].mode != SEARCH_ROOM) || (roomFound[movLog[i].roomID] == true))
     {
       /* Check to see if relates to a search or movmeent */
@@ -331,14 +348,14 @@ void runAutonomousMode()
         if ((movLog[i].time >= MIN_LOG_TIME) &&
             (movLog[i].time <= MAX_LOG_TIME))
         {      
-          inverse = calcMovement(movLog[i]);
+          nextMovement = calcMovement(movLog[i]);
         
           /* Move in inverse direction to backtrace */
           startTime = millis();
-          moveDirection(inverse);
+          moveDirection(nextMovement);
           while (millis() - startTime < movLog[i].time)
           {
-            if (inverse == FORWARD)
+            if (nextMovement == FORWARD)
             {     
               if (isWallFound() == false)
                 correctPath();
@@ -430,7 +447,8 @@ void moveDirection(MOVEMENT movement)
     }
     movLogCount++;
   }
-  
+
+  /* Switch case for actually moving the robot from the relative command */
   switch (movement)
   {
     case FORWARD:
@@ -589,10 +607,12 @@ bool correctPath()
   if ((lastRun == 0) || (millis() - lastRun > CORR_INTERVAL))
   {
     lastRun = millis();
-    
+
+    /* Check to make sure only left sensor is on a line */
     if ((isSensorsOver(LEFT_START, LEFT_START) > 0) &&
         (isSensorsOver(RIGHT_START, RIGHT_START) == 0))
     {
+      /* If true correct path by moving the robot right until not on line */
       motors.setSpeeds(MAX_SPEED, -MAX_SPEED);
       do
       {
@@ -600,13 +620,13 @@ bool correctPath()
       } while (isSensorsOver(LEFT_START, LEFT_START) > 0);
       motors.setSpeeds(MAX_SPEED, MAX_SPEED);
       
-      /* If far left sensor on a line correct path a little */
       Serial.println("Corrected left");
       result = true;
     }
     else if ((isSensorsOver(RIGHT_START, RIGHT_START) > 0) &&
              (isSensorsOver(LEFT_START, LEFT_START) == 0))
     {
+      /* If true correct path by moving the robot left until not on line */
       motors.setSpeeds(-MAX_SPEED, MAX_SPEED);
       do
       {
