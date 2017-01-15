@@ -1,0 +1,59 @@
+Zumo search and rescue robot using Arduino Uno.
+
+Developed by Jack Allister (23042098)
+
+\subsubsection*{Doxygen}
+
+To access the doxygen output of the project please navigate to\+: {\itshape doxygen/html/index.\+html}
+
+\section*{Functionality}
+
+
+\begin{DoxyItemize}
+\item Task 1 -\/ Wireless guided navigation.
+\item Task 2 -\/ Path correction using reflectance sensors.
+\item Task 3 -\/ Wall detection to stop the robot just before.
+\item Task 4 -\/ Room search movement, allows the robot to move into a room for search.
+\item Task 5 -\/ Uses the ultrasonic sensor to search a room for objects
+\item Task 6 -\/ Robot can move autonomously to the begin, only searching rooms where objects were found.
+\item Task 7 -\/ Not completed/implemented.
+\end{DoxyItemize}
+
+\subsection*{Wireless communication/movement.}
+
+The robot is able to move wirelessly using the X\+Bee. This allows the robot to be controlled via simple terminally such as u\+Comm or Pu\+T\+T\+Y using the W\+A\+S\+D keys.
+
+Important information is also sent from the robot back to the terminal such as found objects, movement etc.
+
+\subsection*{Path correction}
+
+Path correction is completed by using the reflectance sensors at the front-\/bottom of the robot.
+
+The algorithm for detecting a wall is simple.
+
+The robot checks every 50ms to see if a wall is detected on one of the outer reflectance sensors.
+
+If so the robot stops it current motion, rotates away from the line and then continues it prior movement.
+
+\subsection*{Wall detection}
+
+Wall detection is implemented by checking the reflectance sensors as well.
+
+If more than one reflectance sensor detects a wall/line boundary then the robot is stopped. This then allows the user to navigate the robot away from the wall (unless in autonomous mode).
+
+\subsection*{Room Searching}
+
+Room searching is implemented by using the ultrasonic sensors. At the moment a maximum range of 20cm from the robot is able to be searched, however this can be changed easily by changing one variable. Refer to check\+For\+Object procedure for more information.
+
+\subsection*{Autonomous navigation}
+
+Autonomous navigation is implemented by using a log of stored movements that are taken while in G\+U\+I\+D\+E\+D\+\_\+\+N\+A\+V\+I\+G\+A\+T\+E and S\+E\+A\+R\+C\+H\+\_\+\+R\+O\+O\+M mode. Wall sensing and path correction are both implemented within this mode so the robot should not be able to leave the specific boundaries of the course.
+
+During the room searches in autonomous navigation, the robot will not search rooms that were found to be empty in user guided searching. This is a form of optimisation that would be crucial in a real world application of search and rescue.
+
+\subsubsection*{Credits/\+References}
+
+
+\begin{DoxyItemize}
+\item New\+Ping library for ultrasonic sensor (Tim Eckel -\/ \href{mailto:teckel@leethost.com}{\tt teckel@leethost.\+com}) 
+\end{DoxyItemize}

@@ -77,10 +77,44 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">Zumo Assignment Documentation</div>  </div>
 </div><!--header-->
 <div class="contents">
-</div><!-- contents -->
+<div class="textblock"><p>Zumo search and rescue robot using Arduino Uno.</p>
+<p>Developed by Jack Allister (23042098)</p>
+<h3>Doxygen</h3>
+<p>To access the doxygen output of the project please navigate to: <em>doxygen/html/index.html</em></p>
+<h1>Functionality</h1>
+<ul>
+<li>Task 1 - Wireless guided navigation.</li>
+<li>Task 2 - Path correction using reflectance sensors.</li>
+<li>Task 3 - Wall detection to stop the robot just before.</li>
+<li>Task 4 - Room search movement, allows the robot to move into a room for search.</li>
+<li>Task 5 - Uses the ultrasonic sensor to search a room for objects</li>
+<li>Task 6 - Robot can move autonomously to the begin, only searching rooms where objects were found.</li>
+<li>Task 7 - Not completed/implemented.</li>
+</ul>
+<h2>Wireless communication/movement.</h2>
+<p>The robot is able to move wirelessly using the XBee. This allows the robot to be controlled via simple terminally such as uComm or PuTTY using the WASD keys.</p>
+<p>Important information is also sent from the robot back to the terminal such as found objects, movement etc.</p>
+<h2>Path correction</h2>
+<p>Path correction is completed by using the reflectance sensors at the front-bottom of the robot.</p>
+<p>The algorithm for detecting a wall is simple.</p>
+<p>The robot checks every 50ms to see if a wall is detected on one of the outer reflectance sensors.</p>
+<p>If so the robot stops it current motion, rotates away from the line and then continues it prior movement.</p>
+<h2>Wall detection</h2>
+<p>Wall detection is implemented by checking the reflectance sensors as well.</p>
+<p>If more than one reflectance sensor detects a wall/line boundary then the robot is stopped. This then allows the user to navigate the robot away from the wall (unless in autonomous mode).</p>
+<h2>Room Searching</h2>
+<p>Room searching is implemented by using the ultrasonic sensors. At the moment a maximum range of 20cm from the robot is able to be searched, however this can be changed easily by changing one variable. Refer to checkForObject procedure for more information.</p>
+<h2>Autonomous navigation</h2>
+<p>Autonomous navigation is implemented by using a log of stored movements that are taken while in GUIDED_NAVIGATE and SEARCH_ROOM mode. Wall sensing and path correction are both implemented within this mode so the robot should not be able to leave the specific boundaries of the course.</p>
+<p>During the room searches in autonomous navigation, the robot will not search rooms that were found to be empty in user guided searching. This is a form of optimisation that would be crucial in a real world application of search and rescue.</p>
+<h3>Credits/References</h3>
+<ul>
+<li>NewPing library for ultrasonic sensor (Tim Eckel - <a href="#" onclick="location.href='mai'+'lto:'+'tec'+'ke'+'l@l'+'ee'+'tho'+'st'+'.co'+'m'; return false;">tecke<span style="display: none;">.nosp@m.</span>l@le<span style="display: none;">.nosp@m.</span>ethos<span style="display: none;">.nosp@m.</span>t.co<span style="display: none;">.nosp@m.</span>m</a>) </li>
+</ul>
+</div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
-Generated on Sun Jan 15 2017 18:21:12 for Zumo Assignment by &#160;<a href="http://www.doxygen.org/index.html">
+Generated on Sun Jan 15 2017 18:56:05 for Zumo Assignment by &#160;<a href="http://www.doxygen.org/index.html">
 <img class="footer" src="doxygen.png" alt="doxygen"/>
 </a> 1.8.8
 </small></address>
